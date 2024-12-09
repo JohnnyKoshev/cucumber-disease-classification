@@ -23,7 +23,6 @@ transform = transforms.Compose([
 
 def load_model(model_path, device):
     model = models.resnet152(weights=None)
-
     model.fc = torch.nn.Linear(model.fc.in_features, len(class_labels))
 
     model.load_state_dict(torch.load(model_path, weights_only=True))
@@ -35,15 +34,18 @@ def load_model(model_path, device):
 
 def predict(image_path, model, device):
     image = Image.open(image_path).convert("RGB")
-
     image = transform(image).unsqueeze(0).to(device)
 
     with torch.no_grad():
         outputs = model(image)
+
         _, predicted_class = torch.max(outputs, 1)
+
         confidence = torch.softmax(outputs, dim=1)[0, predicted_class].item()
 
-    return predicted_class.item(), confidence
+        class_probabilities = torch.softmax(outputs, dim=1).cpu().numpy().flatten()
+
+    return predicted_class.item(), confidence, class_probabilities
 
 
 def main():
@@ -57,10 +59,14 @@ def main():
 
     model = load_model(args.model_path, device)
 
-    predicted_class, confidence = predict(args.image_path, model, device)
+    predicted_class, confidence, class_probabilities = predict(args.image_path, model, device)
 
     print(f"Predicted class: {class_labels[predicted_class]}")
     print(f"Confidence: {confidence:.4f}")
+
+    print("\nClass probabilities:")
+    for label, prob in zip(class_labels, class_probabilities):
+        print(f"{label}: {prob:.4f}")
 
 
 if __name__ == "__main__":
